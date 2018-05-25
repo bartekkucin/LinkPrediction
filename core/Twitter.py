@@ -1,10 +1,12 @@
 # coding: utf-8
 
 import sys
+import zss
 # 1
 import pandas.core.indexes
 import pandas as pd
-import core.Node as node
+import core.TagNode as TagNode
+import core.EditDistance as EditDistance
 import core.DepthSerializer as depthSerializer
 import networkx as nx
 import pydot
@@ -47,7 +49,7 @@ def transformDFObjects2Node(sortedByTag):
         tag = row['tag']
         user = row['user']
         time = row['ts']
-        n = node.make_node(tag, user, time)
+        n = TagNode.make_node(tag, user, time)
 
         if n.user not in nodesUsersList:
             nodesList.append(n)
@@ -70,13 +72,35 @@ def buildTree(nodes):
                         #distinctNodesUsers.append(x)
 
     nodesDepthList = list();
+    treesFilteredList = list();
     #Grouping by Tree's depth
     for i in range(0, len(nodes)):
+        if depth(nodes[i]) >= 3:
+            treesFilteredList.append(nodes[i])
         nodesDepthList.append(depth(nodes[i]))
+
+    #TODO: Obliczyc odlegosci pomiedzy nodami
+
+    #countDistancesBetweenNodesInTrees(treesFilteredList)
 
     printTreeWithHighestDepth(nodes)
 
     countTreesByDepth(nodesDepthList)
+
+    return treesFilteredList
+
+def countDistancesBetweenNodesInTrees(treesFilteredList):
+    for i in range(0, len(treesFilteredList)):
+        currentTreeRoot = treesFilteredList[i]
+        recursiveIterateChildren(currentTreeRoot)
+
+def recursiveIterateChildren(node):
+    for child in node.children:
+        child.set_distance(int(child.ts) - int(node.ts))
+        if child.children:
+            for childd in child.children:
+                recursiveIterateChildren(childd)
+
 
 
 def countTreesByDepth(nodesDepthList):
@@ -167,4 +191,19 @@ nodesList.sort(key=lambda x: x.ts, reverse=False)
 #     print(users)
 # print(nodes)
 
-buildTree(nodesList)
+treeFilteredList = buildTree(nodesList)
+
+
+kmeansDataFrame = pd.DataFrame(columns=['x', 'y'])
+
+for j in range(0, len(treeFilteredList)):
+    for i in range(j, len(treeFilteredList) - 1):
+        dist = zss.simple_distance(
+            treeFilteredList[j], treeFilteredList[i+1], TagNode.Node.get_children, TagNode.Node.get_label, EditDistance.weird_dist)
+        tempDF = pd.DataFrame([[int(dist), i+1]], columns=['x', 'y'])
+        kmeansDataFrame = kmeansDataFrame.append(tempDF, ignore_index=True)
+        print(dist)
+
+kmeansDataFrame.to_pickle("C://Users//BKUCINSK//Documents//Docker//Magister//kmeansTest.pickle")
+
+
