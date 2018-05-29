@@ -9,11 +9,13 @@ import core.TagNode as TagNode
 import core.EditDistance as EditDistance
 import core.DepthSerializer as depthSerializer
 import networkx as nx
-import pydot
-import graphviz
+import core.KMeansHelper as kms
 import matplotlib.pyplot as plt
 import pickle as cPickle
+import numpy as np
 import gc
+from multiprocessing import Pool, Value, Manager
+
 sys.modules['pandas.indexes'] = pandas.core.indexes
 
 pickle_tags = open("C://Users//BKUCINSK//Documents//Docker//Magister//tag.pickle", "rb")
@@ -25,8 +27,6 @@ pickle_followers = open("C://Users//BKUCINSK//Documents//Docker//Magister///foll
 pfo = cPickle.load(pickle_followers)
 pickle_followers.close()
 gc.enable()
-
-treesList = []
 
 def getFollowersListByUser(user, dfx):
     usersSelected = dfx.loc[dfx['user1'] == int(user)]
@@ -167,43 +167,59 @@ def printTree(pfo, nodes):
     plt.show()
 
 
-
-df = emp.groupby(['tag', 'user']).size().reset_index(name='counts')
-
-df2 = df.groupby(['tag']).size().reset_index(name='usersPerTagCount')
-
-dfTagsCount = df2.loc[df2['usersPerTagCount'] >= 500]
-
-tagsWithCountedUsers = pd.merge(emp, dfTagsCount, on='tag', how='inner')
-sortedByTS = tagsWithCountedUsers.sort_values(by=['ts'], ascending=True)
-dupa = sortedByTS.groupby(['tag']).size().reset_index(name='usersPerTagCount')
-print(dupa)
+if __name__ == '__main__':
 
 
-selectedTag = dupa.iloc[16]['tag']
-sortedByTag = emp.loc[emp['tag'].str.strip() == selectedTag]
-# print(sortedByTag)
-nodesList = transformDFObjects2Node(sortedByTag)
-
-nodesList.sort(key=lambda x: x.ts, reverse=False)
-# for p in nodesList:
-#     users = getFollowersListByUser(p.user, pfo)
-#     print(users)
-# print(nodes)
-
-treeFilteredList = buildTree(nodesList)
 
 
-kmeansDataFrame = pd.DataFrame(columns=['x', 'y'])
+    treesList = []
 
-for j in range(0, len(treeFilteredList)):
-    for i in range(j, len(treeFilteredList) - 1):
-        dist = zss.simple_distance(
-            treeFilteredList[j], treeFilteredList[i+1], TagNode.Node.get_children, TagNode.Node.get_label, EditDistance.weird_dist)
-        tempDF = pd.DataFrame([[int(dist), i+1]], columns=['x', 'y'])
-        kmeansDataFrame = kmeansDataFrame.append(tempDF, ignore_index=True)
-        print(dist)
+    df = emp.groupby(['tag', 'user']).size().reset_index(name='counts')
 
-kmeansDataFrame.to_pickle("C://Users//BKUCINSK//Documents//Docker//Magister//kmeansTest.pickle")
+    df2 = df.groupby(['tag']).size().reset_index(name='usersPerTagCount')
+
+    dfTagsCount = df2.loc[df2['usersPerTagCount'] >= 500]
+
+    tagsWithCountedUsers = pd.merge(emp, dfTagsCount, on='tag', how='inner')
+    sortedByTS = tagsWithCountedUsers.sort_values(by=['ts'], ascending=True)
+    dupa = sortedByTS.groupby(['tag']).size().reset_index(name='usersPerTagCount')
+    print(dupa)
+
+
+    selectedTag = dupa.iloc[16]['tag']
+    sortedByTag = emp.loc[emp['tag'].str.strip() == selectedTag]
+    # print(sortedByTag)
+    nodesList = transformDFObjects2Node(sortedByTag)
+
+    nodesList.sort(key=lambda x: x.ts, reverse=False)
+
+   # m = Manager()
+    #my_shared_list = m.list(nodesList)
+    pool = Pool(processes=2)
+    treeFilteredList = pool.apply_async(buildTree, [nodesList])
+    #pool.close()
+    #pool.join()
+    treeFilteredList = treeFilteredList.get()
+
+
+    kmeansDataFrame = pd.DataFrame(columns=['x', 'y'])
+    temporaryTreeList = []
+
+    for j in range(0, len(treeFilteredList)):
+        for i in range(j, len(treeFilteredList) - 1):
+            dist = zss.simple_distance(
+                treeFilteredList[j], treeFilteredList[i+1], TagNode.Node.get_children, TagNode.Node.get_label, EditDistance.weird_dist)
+            temporaryTreeList.append(treeFilteredList[i+1])
+
+            tempDF = pd.DataFrame([[i+1, int(dist)]], columns=['x', 'y'])
+            kmeansDataFrame = kmeansDataFrame.append(tempDF, ignore_index=True)
+            print(dist)
+
+    treeFilteredList = np.array(treeFilteredList)
+    closestTrees = kms.getClosestTreesIds(kmeansDataFrame, 10)
+
+    prototypes = treeFilteredList[closestTrees]
+
+    kmeansDataFrame.to_pickle("C://Users//BKUCINSK//Documents//Docker//Magister//kmeansTest.pickle")
 
 
