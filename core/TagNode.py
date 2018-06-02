@@ -10,16 +10,22 @@ class Node(object):
         self.user = user
         self.ts = ts
         self.distance = 0
+        self.parent = None
         self.children = []
+        self.level = 1
 
     def add_child(self, obj):
         child = Node(obj.tag, obj.user, obj.ts)
+        child.parent = self
         child.set_distance(int(child.ts) - int(self.ts))
         child.children = obj.children
         self.children.append(child)
 
     def set_distance(self, distance):
         self.distance = distance
+
+    def set_level(self, level):
+        self.level = level
 
     @staticmethod
     def get_label(node):
@@ -28,6 +34,11 @@ class Node(object):
     @staticmethod
     def get_children(node):
         return node.children
+
+    def get_rev_children(self):
+        children = self.children[:]
+        children.reverse()
+        return children
 
     def __str__(self, level=0):
         ret = "\t" * level + repr(self.user) + "\n"
