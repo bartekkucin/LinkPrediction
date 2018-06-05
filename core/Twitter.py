@@ -244,39 +244,41 @@ def printTree(pfo, nodes):
 def buildPrototypes(tag):
     print("Now building for tag: {0}".format(tag))
     sortedByTag = emp.loc[emp['tag'].str.strip() == tag]
-    treeFilteredList = list(buildTree(sortedByTag))
-    kmeansDataFrame = pd.DataFrame(columns=['x', 'y'])
+    filteredForest = list(buildTree(sortedByTag))
 
 
-    # treeFilteredLists = [filteredForest[x:x + 200] for x in range(0, len(filteredForest), 200)]
-    #
-    # for treeFilteredList in treeFilteredLists:
-    temporaryTreeList = list()
-    for j, tree1 in enumerate(treeFilteredList):
-        print("Remains: {0}".format(len(treeFilteredList) - j))
-        for i, tree2 in enumerate(treeFilteredList, start = j + 1):
-            dist = zss.simple_distance(
-                tree1, tree2, TagNode.Node.get_children, TagNode.Node.get_label,
-                EditDistance.weird_dist)
-            temporaryTreeList.append(tree2)
 
-            tempDF = pd.DataFrame([[i, int(dist)]], columns=['x', 'y'])
-            kmeansDataFrame = kmeansDataFrame.append(tempDF, ignore_index=True)
-    temporaryTreeList = np.array(temporaryTreeList)
-    if( len(treeFilteredList) >= 10):
-        closestTrees = kms.getClosestTreesIds(kmeansDataFrame, 10, len(temporaryTreeList) + 50)
-        prototypes = temporaryTreeList[closestTrees]
+    treeFilteredLists = [filteredForest[x:x + 200] for x in range(0, len(filteredForest), 200)]
 
-        protList = []
-        if os.path.exists("C://Users//BKUCINSK//Documents//Docker//Magister//prototypes.pickle"):
-            with open("C://Users//BKUCINSK//Documents//Docker//Magister//prototypes.pickle", 'rb') as rfp:
-                protList = cPickle.load(rfp)
+    for treeFilteredList in treeFilteredLists:
+        kmeansDataFrame = pd.DataFrame(columns=['x', 'y'])
+        temporaryTreeList = list()
+        for j, tree1 in enumerate(treeFilteredList):
+            print("Remains: {0}".format(len(treeFilteredList) - j))
+            for i, tree2 in enumerate(treeFilteredList, start = j + 1):
+                dist = zss.simple_distance(
+                    tree1, tree2, TagNode.Node.get_children, TagNode.Node.get_label,
+                    EditDistance.weird_dist)
+                temporaryTreeList.append(tree2)
 
-        protList.append(prototypes)
+                tempDF = pd.DataFrame([[i, int(dist)]], columns=['x', 'y'])
+                kmeansDataFrame = kmeansDataFrame.append(tempDF, ignore_index=True)
+        # temporaryTreeList = np.array(temporaryTreeList)
+        if( len(treeFilteredList) >= 10):
+            closestTrees = kms.getClosestTreesIds(kmeansDataFrame, 10, len(temporaryTreeList) + 50)
+            prototypes = temporaryTreeList[closestTrees]
 
-        cPickle.dump(protList, open("C://Users//BKUCINSK//Documents//Docker//Magister//prototypes.pickle", "wb"),
-                     cPickle.HIGHEST_PROTOCOL)
-        #kmeansDataFrame.to_pickle("C://Users//BKUCINSK//Documents//Docker//Magister//kmeansTest.pickle")
+            protList = []
+            if os.path.exists("C://Users//BKUCINSK//Documents//Docker//Magister//prototypes.pickle"):
+                with open("C://Users//BKUCINSK//Documents//Docker//Magister//prototypes.pickle", 'rb') as rfp:
+                    protList = cPickle.load(rfp)
+
+            protList.append(prototypes)
+
+            cPickle.dump(protList, open("C://Users//BKUCINSK//Documents//Docker//Magister//prototypes.pickle", "wb"),
+                         cPickle.HIGHEST_PROTOCOL)
+            #kmeansDataFrame.to_pickle("C://Users//BKUCINSK//Documents//Docker//Magister//kmeansTest.pickle")
+
 
 if __name__ == '__main__':
 
@@ -291,7 +293,7 @@ if __name__ == '__main__':
     #pool = Pool(2)
 
 
-    for i in range (110, 200):
+    for i in range (3, 100):
 
         selectedTag = selectedTags.iloc[i]['tag']
 
