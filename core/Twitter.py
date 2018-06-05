@@ -14,11 +14,10 @@ import core.KMeansHelper as kms
 import matplotlib.pyplot as plt
 import pickle as cPickle
 import numpy as np
-import gc
 import time
 import copy
-import jsonpickle
-from multiprocessing import Pool, Value, Manager
+from queue import Queue
+from threading import Thread
 
 sys.modules['pandas.indexes'] = pandas.core.indexes
 
@@ -37,8 +36,6 @@ def cacheUsersWithTheirFollowers2(pfo):
 
         distinctUsers.set_value(index, 'followers', usersSelected.values)
         print("Added an user: {0} to dictionary. Remains: {1}".format(currentUser, len(distinctUsers.index) - index))
-        if (len(distinctUsers.index) - index) % 1000 == 0:
-            print("Jak bardzo jestem w dupie na kazdy 1000 iteracji: {0}".format(time.time() - start))
     distinctUsers.to_pickle("C://Users//BKUCINSK//Documents//Docker//Magister//followersOptimized.pickle")
 
     return distinctUsers
@@ -46,17 +43,14 @@ def cacheUsersWithTheirFollowers2(pfo):
 
 
 def getFollowersListByUser(user):
-    start = time.time()
     usersSelected = pfo.loc[pfo['user1'] == int(user)]['followers']
-    end = time.time()
-    print(end-start)
     if(len(usersSelected.values) > 0):
         return usersSelected.values.tolist()[0]
     else:
         return usersSelected.values
 
-pickle_tags = open("C://Users//BKUCINSK//Documents//Docker//Magister//tag.pickle", "rb")
-gc.disable()
+#gc.disable()
+pickle_tags = open("C://Users//BKUCINSK//Documents//Docker//Magister//valuableNodes.pickle", "rb")
 emp = cPickle.load(pickle_tags)
 pickle_tags.close()
 
@@ -65,55 +59,80 @@ pickle_tags.close()
 pickle_followers = open("C://Users//BKUCINSK//Documents//Docker//Magister///followersOptimized.pickle", "rb")
 pfo = cPickle.load(pickle_followers)
 pickle_followers.close()
-gc.enable()
+#gc.enable()
 
 def depth(d, level=1):
     if not d or not d.children:
         return level
     return max(depth(d.children[k], level + 1) for k in range(len(d.children)))
 
+def getTreesByDepth(d, desiredLevel, level=1):
+    if not d or not d.children:
+        return level
+    if level == desiredLevel:
+        return level
+    return max(depth(d.children[k], level + 1) for k in range(len(d.children)))
+
 
 def transformDFObjects2Node(sortedByTag):
-    nodesList = []
-    nodesDistinctList = []
+    nodesList = list()
+    usersDistinctList = set()
     for index, row in sortedByTag.iterrows():
         tag = row['tag']
         user = row['user']
         time = row['ts']
         n = TagNode.make_node(tag, user, time)
-
-        if n not in nodesDistinctList:
+        if n.user not in usersDistinctList:
             nodesList.append(n)
-            nodesDistinctList.append(n)
+            usersDistinctList.add(n.user)
 
     return nodesList
 
-def buildTree(nodes):
+def isAlreadyUsedToCreateATree(node, distinctNodes):
+    for x in distinctNodes:
+        if node.user == x.user and node.tag == x.tag and node.ts == x.ts:
+            return True
+    return False
 
-    treesFilteredList = set();
-    for i in range(0, len(nodes)):
-        nodesReadyToPick = []
-        distinctNodes = set()
+def buildTree(sortedByTag):
 
-        tempNodesList = copy.deepcopy(nodes)
-        nodesReadyToPick.append(tempNodesList[i])
+    distinctNodes = set()
+    treesFilteredList = set()
 
-        while nodesReadyToPick:
-            currentNode = nodesReadyToPick.pop(0)
-            users = getFollowersListByUser(currentNode.user)
-            print("{0}. {1} in work line / {2} users.".format(i, currentNode.user, len(nodes)))
-            for j in range(tempNodesList.index(currentNode) + 1, len(tempNodesList) - 1):
-                if tempNodesList[j] not in distinctNodes and int(tempNodesList[j].user) in users and \
-                                int(tempNodesList[j].ts) > int(currentNode.ts):
+    nodes = transformDFObjects2Node(sortedByTag)
+    nodes.sort(key=lambda x: x.ts, reverse=False)
 
-                    currentNode.add_child(tempNodesList[j])
-                    nodesReadyToPick.append(tempNodesList[j])
-                    distinctNodes.add(tempNodesList[j])
+    for index, node in enumerate(nodes):
+        if isAlreadyUsedToCreateATree(node, distinctNodes):
+            print("Gotcha")
+        else:
+            print("Remains trees to build: {0}".format(len(nodes) - index))
+            nodesReadyToPick = []
+            #distinctNodes = set()
 
-        for k in range(0, len(tempNodesList)):
-            if depth(tempNodesList[k]) >= 3:
-                tempNodesList[k] = calculateLevelsForTree(tempNodesList[k])
-                treesFilteredList.add(tempNodesList[k])
+            tempNodesList = copy.deepcopy(nodes)
+            nodesReadyToPick.append(tempNodesList[index])
+
+            while nodesReadyToPick:
+                currentNode = nodesReadyToPick.pop(0)
+                users = getFollowersListByUser(currentNode.user)
+                #print("{0}. {1} in work line / {2} users.".format(i, currentNode.user, len(nodes)))
+
+                for k, smallNode in enumerate(tempNodesList, start = tempNodesList.index(currentNode) + 1):
+
+                    if smallNode not in distinctNodes and int(smallNode.user) in users and \
+                                    int(smallNode.ts) > int(currentNode.ts):
+
+                        currentNode.add_child(smallNode)
+                        nodesReadyToPick.append(smallNode)
+                        distinctNodes.add(smallNode)
+
+
+
+            for tree in tempNodesList:
+                if depth(tree) >= 3:
+                    tree = calculateLevelsForTree(tree)
+                    treesFilteredList.add(tree)
 
     highestDepthTree = printTreeWithHighestDepth(treesFilteredList)
 
@@ -223,85 +242,71 @@ def printTree(pfo, nodes):
 
 
 def buildPrototypes(tag):
+    print("Now building for tag: {0}".format(tag))
     sortedByTag = emp.loc[emp['tag'].str.strip() == tag]
-    nodesList = transformDFObjects2Node(sortedByTag)
-    nodesList.sort(key=lambda x: x.ts, reverse=False)
-    treeFilteredList = list(buildTree(nodesList))
+    treeFilteredList = list(buildTree(sortedByTag))
     kmeansDataFrame = pd.DataFrame(columns=['x', 'y'])
-    temporaryTreeList = []
-    for j in range(0, len(treeFilteredList)):
-        for i in range(j, len(treeFilteredList) - 1):
+
+
+    # treeFilteredLists = [filteredForest[x:x + 200] for x in range(0, len(filteredForest), 200)]
+    #
+    # for treeFilteredList in treeFilteredLists:
+    temporaryTreeList = list()
+    for j, tree1 in enumerate(treeFilteredList):
+        print("Remains: {0}".format(len(treeFilteredList) - j))
+        for i, tree2 in enumerate(treeFilteredList, start = j + 1):
             dist = zss.simple_distance(
-                treeFilteredList[j], treeFilteredList[i + 1], TagNode.Node.get_children, TagNode.Node.get_label,
+                tree1, tree2, TagNode.Node.get_children, TagNode.Node.get_label,
                 EditDistance.weird_dist)
-            temporaryTreeList.append(treeFilteredList[i + 1])
+            temporaryTreeList.append(tree2)
 
-            tempDF = pd.DataFrame([[i + 1, int(dist)]], columns=['x', 'y'])
+            tempDF = pd.DataFrame([[i, int(dist)]], columns=['x', 'y'])
             kmeansDataFrame = kmeansDataFrame.append(tempDF, ignore_index=True)
-            print(dist)
     temporaryTreeList = np.array(temporaryTreeList)
-    closestTrees = kms.getClosestTreesIds(kmeansDataFrame, 10, len(temporaryTreeList))
-    prototypes = temporaryTreeList[closestTrees]
+    if( len(treeFilteredList) >= 10):
+        closestTrees = kms.getClosestTreesIds(kmeansDataFrame, 10, len(temporaryTreeList) + 50)
+        prototypes = temporaryTreeList[closestTrees]
 
-    protList = []
-    if os.path.exists("C://Users//BKUCINSK//Documents//Docker//Magister//prototypes.pickle"):
-        with open("C://Users//BKUCINSK//Documents//Docker//Magister//prototypes.pickle", 'rb') as rfp:
-            protList = cPickle.load(rfp)
+        protList = []
+        if os.path.exists("C://Users//BKUCINSK//Documents//Docker//Magister//prototypes.pickle"):
+            with open("C://Users//BKUCINSK//Documents//Docker//Magister//prototypes.pickle", 'rb') as rfp:
+                protList = cPickle.load(rfp)
 
-    protList.append(prototypes)
+        protList.append(prototypes)
 
-    cPickle.dump(protList, open("C://Users//BKUCINSK//Documents//Docker//Magister//prototypes.pickle", "wb"),
-                 cPickle.HIGHEST_PROTOCOL)
-    kmeansDataFrame.to_pickle("C://Users//BKUCINSK//Documents//Docker//Magister//kmeansTest.pickle")
-
+        cPickle.dump(protList, open("C://Users//BKUCINSK//Documents//Docker//Magister//prototypes.pickle", "wb"),
+                     cPickle.HIGHEST_PROTOCOL)
+        #kmeansDataFrame.to_pickle("C://Users//BKUCINSK//Documents//Docker//Magister//kmeansTest.pickle")
 
 if __name__ == '__main__':
 
-    df = emp.groupby(['tag', 'user']).size().reset_index(name='counts')
 
-    df2 = df.groupby(['tag']).size().reset_index(name='usersPerTagCount')
+    st = open("C://Users//BKUCINSK//Documents//Docker//Magister//selectedValuableTags.pickle", "rb")
+    selectedTags = cPickle.load(st)
+    st.close()
 
-    dfTagsCount = df2.loc[df2['usersPerTagCount'] >= 500]
-
-    tagsWithCountedUsers = pd.merge(emp, dfTagsCount, on='tag', how='inner')
-    sortedByTS = tagsWithCountedUsers.sort_values(by=['ts'], ascending=True)
-
-
-    dupa = sortedByTS.groupby(['tag']).size().reset_index(name='usersPerTagCount')
-    print(dupa)
-
-    del df
-    del df2
-    del dfTagsCount
-    del tagsWithCountedUsers
-    del sortedByTS
-    del pickle_tags
-    del pickle_followers
-
-
-    gc.collect()
+    #gc.collect()
 
     tagsToCompute = []
-    for i in range (1, 100):
-        selectedTag = dupa.iloc[i]['tag']
-        tagsToCompute.append(selectedTag)
-    #buildPrototypes(selectedTag)
+    #pool = Pool(2)
 
-    try:
 
-        pool = Pool(2)
-        pool.map(buildPrototypes, tagsToCompute)
+    for i in range (110, 200):
 
-        del df
-        del df2
-        del dfTagsCount
-        del tagsWithCountedUsers
-        del sortedByTS
-        del pickle_tags
-        del pickle_followers
+        selectedTag = selectedTags.iloc[i]['tag']
 
-        buildPrototypes(tagsToCompute)
-    finally:
-        pool.close()
-        pool.join()
+        # i = Process(target=buildPrototypes, args=(selectedTag,))
+    # i.start()
+    # i.join()
+    #     tagsToCompute.append(selectedTag)
+    # pool.apply_async(buildPrototypes, (selectedTag, ))
+        buildPrototypes(selectedTag)
 
+    # pool = ThreadPool(5)
+
+    # Add the jobs in bulk to the thread pool. Alternatively you could use
+    # `pool.add_task` to add single jobs. The code will block here, which
+    # makes it possible to cancel the thread pool with an exception when
+    # the currently running batch of workers is finished.
+    # pool.map(buildPrototypes, tagsToCompute)
+    # pool.wait_completion()

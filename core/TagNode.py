@@ -14,11 +14,18 @@ class Node(object):
         self.children = []
         self.level = 1
 
-    def add_child(self, obj):
-        child = Node(obj.tag, obj.user, obj.ts)
+    def add_child(self, child):
+        #child = Node(obj.tag, obj.user, obj.ts)
         child.parent = self
         child.set_distance(int(child.ts) - int(self.ts))
-        child.children = obj.children
+        #child.children = obj.children
+        self.children.append(child)
+
+    def add_child_with_values(self, tag, user, ts):
+        child = Node(tag, user, ts)
+        child.parent = self
+        child.set_distance(int(child.ts) - int(self.ts))
+        #child.children = obj.children
         self.children.append(child)
 
     def set_distance(self, distance):

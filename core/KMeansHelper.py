@@ -7,6 +7,8 @@ import pickle as cPickle
 from sklearn.cluster import KMeans
 from sklearn.metrics import pairwise_distances_argmin_min
 
+
+
 def loadDatafromPickle(fileName):
     pickle_followers = open(fileName, "rb")
     df = cPickle.load(pickle_followers)
