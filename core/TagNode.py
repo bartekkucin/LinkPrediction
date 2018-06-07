@@ -39,6 +39,10 @@ class Node(object):
         return node.ts
 
     @staticmethod
+    def get_label2(node):
+        return node.ts
+
+    @staticmethod
     def get_children(node):
         return node.children
 

@@ -16,8 +16,7 @@ import pickle as cPickle
 import numpy as np
 import time
 import copy
-from queue import Queue
-from threading import Thread
+
 
 sys.modules['pandas.indexes'] = pandas.core.indexes
 
@@ -94,13 +93,10 @@ def isAlreadyUsedToCreateATree(node, distinctNodes):
             return True
     return False
 
-def buildTree(sortedByTag):
+def buildTree(nodes):
 
     distinctNodes = set()
     treesFilteredList = set()
-
-    nodes = transformDFObjects2Node(sortedByTag)
-    nodes.sort(key=lambda x: x.ts, reverse=False)
 
     for index, node in enumerate(nodes):
         if isAlreadyUsedToCreateATree(node, distinctNodes):
@@ -130,7 +126,7 @@ def buildTree(sortedByTag):
 
 
             for tree in tempNodesList:
-                if depth(tree) >= 3:
+                if depth(tree) >= 4:
                     tree = calculateLevelsForTree(tree)
                     treesFilteredList.add(tree)
 
@@ -242,11 +238,15 @@ def printTree(pfo, nodes):
 
 
 def buildPrototypes(tag):
-    print("Now building for tag: {0}".format(tag))
+
     sortedByTag = emp.loc[emp['tag'].str.strip() == tag]
-    filteredForest = list(buildTree(sortedByTag))
 
-
+    nodes = transformDFObjects2Node(sortedByTag)
+    if(len(nodes) < 10000):
+        nodes.sort(key=lambda x: x.ts, reverse=False)
+        filteredForest = list(buildTree(nodes))
+    else:
+        return
 
     treeFilteredLists = [filteredForest[x:x + 200] for x in range(0, len(filteredForest), 200)]
 
@@ -263,9 +263,9 @@ def buildPrototypes(tag):
 
                 tempDF = pd.DataFrame([[i, int(dist)]], columns=['x', 'y'])
                 kmeansDataFrame = kmeansDataFrame.append(tempDF, ignore_index=True)
-        # temporaryTreeList = np.array(temporaryTreeList)
+        temporaryTreeList = np.array(temporaryTreeList)
         if( len(treeFilteredList) >= 10):
-            closestTrees = kms.getClosestTreesIds(kmeansDataFrame, 10, len(temporaryTreeList) + 50)
+            closestTrees = kms.getClosestTreesIds(kmeansDataFrame, 10, len(treeFilteredList) + 50)
             prototypes = temporaryTreeList[closestTrees]
 
             protList = []
@@ -292,17 +292,17 @@ if __name__ == '__main__':
     tagsToCompute = []
     #pool = Pool(2)
 
+# Dodaj 3
+    #for i in range (364, 400):
 
-    for i in range (3, 100):
-
-        selectedTag = selectedTags.iloc[i]['tag']
-
+    selectedTag = selectedTags.iloc[16]['tag']
+    #print("Now building for tag: {0}/{1}".format(selectedTag, i))
         # i = Process(target=buildPrototypes, args=(selectedTag,))
     # i.start()
     # i.join()
     #     tagsToCompute.append(selectedTag)
     # pool.apply_async(buildPrototypes, (selectedTag, ))
-        buildPrototypes(selectedTag)
+    buildPrototypes(selectedTag)
 
     # pool = ThreadPool(5)
 

@@ -36,34 +36,17 @@ def printKMeansChart(centroids, df, labels, clustersNumber, plotSize):
     kmeans = KMeans(n_clusters=clustersNumber)
     #centroids = getCentroidsForTrees(df, kmeans)
     colmap = {1: 'r', 2: 'g', 3: 'b', 4: 'm', 5: 'brown', 6: 'gold', 7: 'navy', 8: 'tan', 9: 'olive', 10: 'lightpink'}
-    fig = plt.figure(figsize=(5, 5))
+    fig = plt.figure(figsize=(8, 8))
     colors = map(lambda x: colmap[x + 1], labels)
     plt.scatter(df['x'], df['y'], color=list(colors), alpha=0.5, edgecolor='k')
     for idx, centroid in enumerate(centroids):
         plt.scatter(*centroid, color=colmap[idx + 1])
+
+    plt.xlabel('Indeks drzewa podczas iteracji', fontsize=18)
+    plt.ylabel('Wartość odległości edycyjnej', fontsize=18)
     plt.xlim(0, plotSize)
-    plt.ylim(0, 2880)
+    plt.ylim(0, 800)
     plt.show()
-
-
-def cutTreeByLevel(node, level):
-    if not node.children:
-        print("There are no children for this node.")
-
-    nodesToCheck = []
-    nodesToCheck.append(node)
-
-    while nodesToCheck:
-        currentNode = nodesToCheck.pop(0)
-        for child in currentNode.children:
-            if len(child.children) > 0 and child.children[0].level > level:
-                child.children = []
-                print("Cutted in node: " + child.user)
-            else:
-                for kid in child.children:
-                    nodesToCheck.append(kid)
-
-    return node
 
 def removeAnomaliesForTree(node):
     if not node.children:
@@ -92,8 +75,10 @@ def removeAnomaliesForTree(node):
                 node.parent.children.remove(node)
     return node
 
-#with open("C://Users//BKUCINSK//Documents//Docker//Magister//kmeansTest.pickle", 'rb') as rfp:
-# kMeansTest = cPickle.load(rfp)
+with open("C://Users//BKUCINSK//Documents//Docker//Magister//kmeans1days.pickle", 'rb') as rfp:
+    kMeansTest = cPickle.load(rfp)
+
+getClosestTreesIds(kMeansTest, 10, 140)
 #
 #
 #
