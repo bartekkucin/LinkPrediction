@@ -1,4 +1,5 @@
 import zss
+import math
 
 try:
     from editdist import distance as strdist
@@ -25,7 +26,10 @@ except ImportError:
                 if a != "" and b != "":
                     if calculateSimilarity(int(a), int(b)):
                         return 0
-
+                    else:
+                        return 10
+                if b == "":
+                    return 50
                 return 1
 
 def weird_dist(NodeA, NodeB):
@@ -36,7 +40,7 @@ def weird_dist2(NodeA, NodeB):
 
 def calculateSimilarity(a, b) :
     distance = a - b
-    if(distance > 100):
+    if(math.fabs(distance) > 1000):
         return False
     return True
 

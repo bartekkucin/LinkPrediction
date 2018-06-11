@@ -42,10 +42,11 @@ def printKMeansChart(centroids, df, labels, clustersNumber, plotSize):
     for idx, centroid in enumerate(centroids):
         plt.scatter(*centroid, color=colmap[idx + 1])
 
+    #plt.title('1day')
     plt.xlabel('Indeks drzewa podczas iteracji', fontsize=18)
     plt.ylabel('Wartość odległości edycyjnej', fontsize=18)
     plt.xlim(0, plotSize)
-    plt.ylim(0, 800)
+    plt.ylim(0, 1000)
     plt.show()
 
 def removeAnomaliesForTree(node):
@@ -75,10 +76,10 @@ def removeAnomaliesForTree(node):
                 node.parent.children.remove(node)
     return node
 
-with open("C://Users//BKUCINSK//Documents//Docker//Magister//kmeans1days.pickle", 'rb') as rfp:
-    kMeansTest = cPickle.load(rfp)
-
-getClosestTreesIds(kMeansTest, 10, 140)
+# with open("C://Users//BKUCINSK//Documents//Docker//Magister//kmeans1days.pickle", 'rb') as rfp:
+#     kMeansTest = cPickle.load(rfp)
+#
+# getClosestTreesIds(kMeansTest, 10, 140)
 #
 #
 #

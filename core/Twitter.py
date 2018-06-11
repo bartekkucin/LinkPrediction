@@ -9,7 +9,6 @@ import pandas as pd
 import core.TagNode as TagNode
 import core.EditDistance as EditDistance
 import core.DepthSerializer as depthSerializer
-import networkx as nx
 import core.KMeansHelper as kms
 import matplotlib.pyplot as plt
 import pickle as cPickle
@@ -52,8 +51,6 @@ def getFollowersListByUser(user):
 pickle_tags = open("C://Users//BKUCINSK//Documents//Docker//Magister//valuableNodes.pickle", "rb")
 emp = cPickle.load(pickle_tags)
 pickle_tags.close()
-
-#TODO: Sprawdzic usera '555053'
 
 pickle_followers = open("C://Users//BKUCINSK//Documents//Docker//Magister///followersOptimized.pickle", "rb")
 pfo = cPickle.load(pickle_followers)
@@ -202,47 +199,12 @@ def calculateLevelsForTree(node):
     return node
 
 
-def printTree(pfo, nodes):
-
-    G = nx.DiGraph()
-
-    #initialize root
-    root = nodes[0]
-    G.add_node(str(root.ts), tag=root.tag)
-
-    for i in range(1, len(nodes)):
-        user = nodes[i].user
-        G.add_node(str(nodes[i].ts), tag=nodes[i].tag)
-        if user != root.user:
-            users = getFollowersListByUser(user, pfo)
-            for x in users:
-                print(x)
-                for nodee in nodes:
-                    if nodee.user == str(x):
-                        G.add_edge(nodes[i - 1].ts, nodee.ts)
-
-    G.nodes(data=True)
-
-    # write dot file to use with graphviz
-    # run "dot -Tpng test.dot >test.png"
-    #nx.nx_pydot.write_dot(G, 'test.dot')
-
-    # same layout using matplotlib with no labels
-    plt.title(str(root.tag))
-    pos = nx.spring_layout(G)
-    nx.draw_networkx_edges(G, pos, with_labels=True, arrows=True, width=0.5, alpha=0.5)
-    plt.savefig('nx_test.png')
-
-    plt.figure(figsize=(18,18))
-    plt.show()
-
-
 def buildPrototypes(tag):
 
     sortedByTag = emp.loc[emp['tag'].str.strip() == tag]
 
     nodes = transformDFObjects2Node(sortedByTag)
-    if(len(nodes) < 10000):
+    if(len(nodes) < 7000):
         nodes.sort(key=lambda x: x.ts, reverse=False)
         filteredForest = list(buildTree(nodes))
     else:
@@ -264,20 +226,24 @@ def buildPrototypes(tag):
                 tempDF = pd.DataFrame([[i, int(dist)]], columns=['x', 'y'])
                 kmeansDataFrame = kmeansDataFrame.append(tempDF, ignore_index=True)
         temporaryTreeList = np.array(temporaryTreeList)
+
+        if os.path.exists("C://Users//BKUCINSK//Documents//Docker//Magister//prototypes.pickle"):
+            with open("C://Users//BKUCINSK//Documents//Docker//Magister//prototypes.pickle", 'rb') as rfp:
+                protList = cPickle.load(rfp)
+
         if( len(treeFilteredList) >= 10):
-            closestTrees = kms.getClosestTreesIds(kmeansDataFrame, 10, len(treeFilteredList) + 50)
+            closestTrees = kms.getClosestTreesIds(kmeansDataFrame, 10, (len(treeFilteredList) + 100))
             prototypes = temporaryTreeList[closestTrees]
-
-            protList = []
-            if os.path.exists("C://Users//BKUCINSK//Documents//Docker//Magister//prototypes.pickle"):
-                with open("C://Users//BKUCINSK//Documents//Docker//Magister//prototypes.pickle", 'rb') as rfp:
-                    protList = cPickle.load(rfp)
-
             protList.append(prototypes)
 
-            cPickle.dump(protList, open("C://Users//BKUCINSK//Documents//Docker//Magister//prototypes.pickle", "wb"),
-                         cPickle.HIGHEST_PROTOCOL)
-            #kmeansDataFrame.to_pickle("C://Users//BKUCINSK//Documents//Docker//Magister//kmeansTest.pickle")
+        else:
+            protList.append(treeFilteredList)
+
+
+
+        cPickle.dump(protList, open("C://Users//BKUCINSK//Documents//Docker//Magister//prototypes.pickle", "wb"),
+                     cPickle.HIGHEST_PROTOCOL)
+        kmeansDataFrame.to_pickle("C://Users//BKUCINSK//Documents//Docker//Magister//kmeansTest.pickle")
 
 
 if __name__ == '__main__':
@@ -290,25 +256,12 @@ if __name__ == '__main__':
     #gc.collect()
 
     tagsToCompute = []
-    #pool = Pool(2)
 
-# Dodaj 3
-    #for i in range (364, 400):
+    for i in range (1061, 1062):
 
-    selectedTag = selectedTags.iloc[16]['tag']
-    #print("Now building for tag: {0}/{1}".format(selectedTag, i))
-        # i = Process(target=buildPrototypes, args=(selectedTag,))
-    # i.start()
-    # i.join()
-    #     tagsToCompute.append(selectedTag)
-    # pool.apply_async(buildPrototypes, (selectedTag, ))
-    buildPrototypes(selectedTag)
+        selectedTag = selectedTags.iloc[i]['tag']
+        print("Now building for tag: {0}/{1}".format(selectedTag, i))
 
-    # pool = ThreadPool(5)
+        buildPrototypes(selectedTag)
 
-    # Add the jobs in bulk to the thread pool. Alternatively you could use
-    # `pool.add_task` to add single jobs. The code will block here, which
-    # makes it possible to cancel the thread pool with an exception when
-    # the currently running batch of workers is finished.
-    # pool.map(buildPrototypes, tagsToCompute)
-    # pool.wait_completion()
+
